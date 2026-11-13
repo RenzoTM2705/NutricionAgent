@@ -62,7 +62,11 @@ def test_backup_created_on_overwrite(vault: Vault, tmp_path: Path):
 
 
 def test_read_corrupt_file_raises_vault_error(vault: Vault):
+    # Perfil completo pero con un dato inválido (edad 0) -> VaultError.
     vault.perfil_path.parent.mkdir(parents=True, exist_ok=True)
-    vault.perfil_path.write_text("---\nedad: 0\n---\n", encoding="utf-8")
+    vault.perfil_path.write_text(
+        "---\nedad: 0\npeso_kg: 75.0\naltura_cm: 178.0\n---\n",
+        encoding="utf-8",
+    )
     with pytest.raises(VaultError):
         vault.read_perfil()
