@@ -1,0 +1,2 @@
+# Herramientas de desarrollo y build (no van al ejecutable final)
+pyinstaller>=6.0,<7

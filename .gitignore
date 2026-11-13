@@ -12,13 +12,12 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 *.egg-info/
-build/
-dist/
+
 
 # Configuración local
 .env
 
-# Datos del usuario (NUNCA subir)
+# Datos del usuario
 data/
 vault/
 backups/
@@ -40,3 +39,10 @@ desktop.ini
 *.gguf
 *.bin
 models/
+
+# PyInstaller / Inno Setup
+dist/
+build/
+*.spec.bak
+NutricionAgent-Setup-*.exe
+*.sha256
