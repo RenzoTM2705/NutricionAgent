@@ -49,16 +49,33 @@ estas formas; no añadas texto fuera del JSON):
    {"tipo": "eliminar_item", "indice": <entero >= 1>, \
 "fecha": <"YYYY-MM-DD"|"hoy"|"ayer"|null>}
 
-4. Consultar totales del día:
+4. Editar un item existente por su índice (1 = primero). Al menos uno
+   de cantidad, unidad o etiqueta debe indicarse:
+   {"tipo": "editar_item", "indice": <entero >= 1>,
+    "cantidad": <número|null>, "unidad": "g"|"ml"|"unidad"|"porcion"|null,
+    "etiqueta": <string|null>, "fecha": <"YYYY-MM-DD"|"hoy"|"ayer"|null>}
+
+5. Consultar totales del día:
    {"tipo": "consultar_totales", "fecha": <"YYYY-MM-DD"|"hoy"|"ayer"|null>}
 
-5. Listar los items del día:
+6. Listar los items del día:
    {"tipo": "listar_items", "fecha": <"YYYY-MM-DD"|"hoy"|"ayer"|null>}
 
-6. Buscar alimentos en la bóveda por texto:
+7. Buscar alimentos en la bóveda por texto:
    {"tipo": "consultar_alimentos", "texto": "<subcadena>"}
 
-7. Responder sin ejecutar nada (aclaraciones, errores, saludos):
+8. Dar de alta un alimento nuevo (solo si el usuario lo pide explícitamente
+   y proporciona al menos nombre y algún valor nutricional o deja claro
+   que los desconoce):
+   {"tipo": "alta_alimento", "id": "<id-slug-sin-espacios>",
+    "nombre": "<nombre>", "marca": <string|null>,
+    "unidad_base": "g"|"ml"|"unidad"|"porcion",
+    "peso_referencia_g": <número|null>,
+    "kcal_por_100": <número|null>, "proteina_g_por_100": <número|null>,
+    "grasa_g_por_100": <número|null>, "carbo_g_por_100": <número|null>,
+    "fuente": <string|null>, "notas": <string|null>}
+
+9. Responder sin ejecutar nada (aclaraciones, errores, saludos):
    {"tipo": "responder", "mensaje": "<texto>"}
 
 Reglas:
@@ -70,6 +87,11 @@ para avisar de que no está en la bóveda y sugiere buscarlo o darlo de alta.
 - Si el usuario menciona "ayer", usa fecha="ayer". Si no menciona fecha, \
 usa fecha=null (el sistema usará hoy).
 - No devuelvas nada más que el objeto JSON.
+- Si el usuario pide añadir un alimento que no existe, propone "alta_alimento"
+  con los datos que dé. No inventes valores: deja null los que no dé.
+- El id del alimento nuevo debe ser un slug sin espacios (minúsculas, guiones).
+- Para borrar la etiqueta de un item, usa "etiqueta": "".
+- editar_item no cambia el alimento ni la receta; solo cantidad, unidad o etiqueta.
 """
 
 

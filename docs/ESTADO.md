@@ -67,10 +67,37 @@ y envolviendo el contexto entre marcadores.
 - El modelo nunca decide la fecha “porque sí”: si la incluye, es
   porque el usuario la mencionó; el bucle la valida con `parsear_fecha`.
 
+## Fase 7 — Completada
+
+### Completado
+
+- **7.1** — `main.py` entra al bucle si hay perfil; si no, asistente y luego bucle.
+- **7.2** — Comandos locales en el bucle: `/hoy`, `/perfil`, `/objetivos`,
+  `/actividad`, `/alimentos`, `/recetas`, `/modelo`, `/configurar`, `/ayuda`,
+  `/salir`. Comandos desconocidos (`/...`) se rechazan sin llamar al modelo.
+- **7.3** — Alta de alimentos conversacional (`AltaAlimentoOp`) con confirmación.
+- **7.4** — Edición de items (`EditarItemOp`: cantidad, unidad, etiqueta)
+  con confirmación.
+- **7.6** — `app/_smoke_fase7.py`: humo real completo. Exit 0.
+
+### Incidencia corregida
+
+`main.py` usaba `root_for_backup = project_root / "data"` fijo, lo que rompía
+`backup_file` cuando `NUTRICIONAGENT_DATA_DIR` apuntaba fuera del proyecto.
+Corregido a `root_for_backup = data_dir.parent`, coherente con la bóveda
+temporal y con la posibilidad de mover los datos a otro disco.
+
+### Notas
+
+- `/modelo` cambia el modelo solo en memoria; `.env` no se modifica.
+- `/configurar` reabre el asistente con `sobrescribir=True` y confirmación.
+- Las altas y ediciones piden confirmación antes de escribir.
+
 ## Siguiente
 
-- Fase 7 — Comandos y edición (`/perfil`, `/modelo`, `/objetivos`,
-  `/actividad`, `/alimentos`, alta de alimentos, edición de items).
+- Fase 8 — Actividad diaria y gasto energético.
+- Fase 9 — Reportes.
+- Fase 10 — Distribución.
 
 ## Reglas fijadas
 
@@ -91,7 +118,6 @@ y envolviendo el contexto entre marcadores.
 - Remoto: origin (GitHub) con main y develop. Las ramas feat aún no se han subido.
 
 
-- Fase 7: agente conversacional.
 - Fase 8: actividad y gasto.
 - Fase 9: reportes.
 - Fase 10: distribución.
@@ -132,7 +158,3 @@ La bóveda queda lista para que el usuario configure su perfil real con
 - Actividad habitual guardada como referencia inicial.
 - La actividad diaria real se añadirá en Fase 8 (el balance usará la
   actividad del día cuando exista, y solo caerá a la referencia si no).
-
-## Siguiente
-
-- Fase 6 — Registro diario vía agente.

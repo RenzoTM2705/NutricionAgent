@@ -131,3 +131,26 @@ def test_run_loop_error_referencia_inexistente_no_rompe(vault: Vault):
         rc = run_loop(vault, client, console)
     assert rc == 0
     assert vault.read_registro(date.today()) is None
+
+def test_run_loop_comando_desconocido_no_llama_al_modelo(vault: Vault):
+    console = _console_silenciosa()
+    client = MagicMock()
+    with patch(
+        "app.agent.loop.Prompt.ask",
+        side_effect=_lines("/actividada", "/modelos", "/salir"),
+    ):
+        rc = run_loop(vault, client, console)
+    assert rc == 0
+    client.generate.assert_not_called()
+    
+def test_run_loop_lenguaje_natural_llama_al_modelo(vault: Vault):
+    console = _console_silenciosa()
+    client = MagicMock()
+    client.generate.return_value = '{"tipo":"consultar_totales"}'
+    with patch(
+        "app.agent.loop.Prompt.ask",
+        side_effect=_lines("¿cuántas kcal llevo?", "/salir"),
+    ):
+        rc = run_loop(vault, client, console)
+    assert rc == 0
+    client.generate.assert_called_once()
