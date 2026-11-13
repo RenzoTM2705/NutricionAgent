@@ -1,24 +1,37 @@
-# Cómo publicar una release
+## NutricionAgent v0.1.0
 
-Pasos manuales para publicar una nueva versión de NutricionAgent en GitHub Releases.
+Primera versión pública de NutricionAgent: asistente nutricional local con IA, memoria Markdown y cálculos deterministas.
 
-## Requisitos
+### Cambios
 
-- PyInstaller instalado (`pip install -r requirements-dev.txt`).
-- Inno Setup 7 instalado (ruta: `E:\InnoSetup\Inno Setup 7\ISCC.exe` en esta máquina).
-- Acceso al repositorio en GitHub.
+- Asistente de configuración inicial guiado (perfil, objetivos, actividad).
+- Agente conversacional local con Ollama (modelo intercambiable).
+- Registro diario de comidas con cálculo de kcal y macros.
+- Alta de alimentos y edición de items conversacional.
+- Actividad del día y balance energético usando actividad real.
+- Reportes diarios, semanales y mensuales en Markdown.
+- Bóveda Markdown compatible con Obsidian (opcional).
+- Ejecutable Windows (PyInstaller) e instalador (Inno Setup).
+- Datos del usuario en `%LOCALAPPDATA%\NutricionAgent\`, independientes del ejecutable.
 
-## Pasos
+### Instalación
 
-### 1. Actualizar versión
+1. Descarga `NutricionAgent-Setup-0.1.0.exe` desde los assets de esta release.
+2. Ejecuta el instalador. Por defecto se instala en `%LOCALAPPDATA%\Programs\NutricionAgent\`, pero puedes cambiar la carpeta.
+3. Si no tienes Ollama, instálalo: https://ollama.com/download/windows
+4. Descarga el modelo recomendado:
+5. Abre NutricionAgent desde el Menú Inicio o el escritorio y completa el asistente.
 
-- Edita `app/__init__.py`: `__version__ = "X.Y.Z"`.
-- Edita `installer.iss`: `#define MyAppVersion "X.Y.Z"`.
-- Añade entrada en `CHANGELOG.md`.
+### Dónde están tus datos
 
-### 2. Generar el ejecutable
+- Datos del usuario: `%LOCALAPPDATA%\NutricionAgent\data\vault\` (bóveda Markdown).
+- Configuración: `%LOCALAPPDATA%\NutricionAgent\.env`.
+- Backups: `%LOCALAPPDATA%\NutricionAgent\data\backups\`.
 
-```powershell
-Set-Location "E:\Proyectos\NutricionAgent"
-.\.venv\Scripts\Activate.ps1
-pyinstaller nutricionagent.spec --noconfirm
+Al desinstalar, el instalador pregunta si quieres borrar tus datos. Por defecto, no.
+
+### Modo "solo memoria"
+
+Si Ollama no está instalado o no responde, la app ofrece continuar sin IA. Puedes registrar comidas y actividad; los cálculos funcionan igual. Cuando instales Ollama, la IA se habilita.
+
+### SHA256
