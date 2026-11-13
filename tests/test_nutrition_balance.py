@@ -49,19 +49,21 @@ def _alimento(id_="arroz", kcal=130.0):
     )
 
 
-def test_balance_calculado(vault: Vault):
+def test_balance_parcial_con_actividad_habitual(vault: Vault):
+    # Sin actividad del día: TDEE usa la habitual -> balance PARCIAL.
     vault.add_alimento(_alimento(kcal=100.0))
     reg = RegistroDiario(
         fecha=date(2026, 11, 12),
         items=[ItemComida(alimento_id="arroz", cantidad=2000, unidad=Unidad.G)],
     )
-    # consumo = 100 * 20 = 2000 kcal
-    # TDEE = 1717.5 * 1.55 = 2662.125
     out = calcular_balance(reg, _perfil(), _act(), vault)
-    assert out.fuente == Fuente.CALCULADO
+    assert out.fuente == Fuente.PARCIAL
     assert out.consumo_kcal == pytest.approx(2000.0)
     assert out.gasto_kcal == pytest.approx(2662.125)
     assert out.balance_kcal == pytest.approx(2000.0 - 2662.125)
+    assert any(
+        "habitual" in n.lower() or "aproximado" in n.lower() for n in out.notas
+    )
 
 
 def test_balance_consumo_desconocido(vault: Vault):

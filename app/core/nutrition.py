@@ -8,8 +8,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Optional
 
-from app.core.metabolic import calcular_tdee
-
+from app.core.metabolic import calcular_tdee_dia
 
 from app.core.errors import ReferenciaInexistente, UnidadIncompatible
 from app.core.results import (
@@ -229,13 +228,14 @@ def calcular_balance(
     actividad: ActividadHabitual,
     vault: Vault,
 ) -> BalanceDiario:
-    """Consumo (totales del día) - gasto (TDEE estimado).
+    """Consumo (totales del día) - gasto (TDEE con actividad del día si existe).
 
     - Si falta consumo o gasto -> balance None, fuente PENDIENTE.
-    - Si ambos existen -> balance real, fuente CALCULADO.
+    - Si ambos existen y el TDEE es CALCULADO -> fuente CALCULADO.
+    - Si ambos existen pero el TDEE es PARCIAL -> fuente PARCIAL.
     """
     totales = calcular_totales_dia(registro, vault)
-    tdee = calcular_tdee(perfil, actividad)
+    tdee = calcular_tdee_dia(perfil, actividad, registro.actividad_dia)
 
     notas: list[str] = []
 
@@ -259,12 +259,23 @@ def calcular_balance(
             notas=notas,
         )
 
+    # Determinar fuente del balance a partir del TDEE.
+    if tdee.fuente == Fuente.CALCULADO:
+        fuente = Fuente.CALCULADO
+    else:
+        # TDEE parcial (usó actividad habitual o le faltaba algo)
+        fuente = Fuente.PARCIAL
+        notas.append(
+            f"Gasto estimado con fuente {tdee.fuente.value}; "
+            f"el balance es aproximado."
+        )
+
     return BalanceDiario(
         fecha=registro.fecha,
         consumo_kcal=consumo,
         gasto_kcal=gasto,
         balance_kcal=consumo - gasto,
-        fuente=Fuente.CALCULADO,
+        fuente=fuente,
         notas=notas,
     )
 

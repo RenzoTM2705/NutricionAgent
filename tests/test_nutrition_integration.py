@@ -116,10 +116,14 @@ def test_flujo_completo(vault: Vault):
 
     # Balance
     balance = calcular_balance(reg, perfil, actividad, vault)
-    assert balance.fuente == Fuente.CALCULADO
+    assert balance.fuente == Fuente.PARCIAL
     assert balance.consumo_kcal == pytest.approx(457.5)
     assert balance.gasto_kcal == pytest.approx(tdee.tdee_kcal)
     assert balance.balance_kcal == pytest.approx(457.5 - tdee.tdee_kcal)
+    assert any(
+            "habitual" in n.lower() or "aproximado" in n.lower()
+            for n in balance.notas
+        )
 
 
 def test_receta_calculada_desde_vault(vault: Vault):

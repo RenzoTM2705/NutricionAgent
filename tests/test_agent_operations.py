@@ -196,3 +196,24 @@ def test_validar_editar_item_indice_cero_falla():
         validar_operacion(
             {"tipo": "editar_item", "indice": 0, "cantidad": 100}
         )
+
+def test_validar_registrar_actividad():
+    from app.agent.operations import RegistrarActividadOp
+    op = validar_operacion(
+        {
+            "tipo": "registrar_actividad",
+            "pasos": 9000,
+            "gimnasio": True,
+            "gimnasio_duracion_min": 60,
+        }
+    )
+    assert isinstance(op, RegistrarActividadOp)
+    assert op.pasos == 9000
+    assert op.gimnasio is True
+    assert op.horas_trabajo is None
+
+
+def test_validar_registrar_actividad_sin_campos_falla():
+    from app.agent.operations import OperacionInvalida
+    with pytest.raises(OperacionInvalida):
+        validar_operacion({"tipo": "registrar_actividad"})

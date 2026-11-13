@@ -93,9 +93,41 @@ temporal y con la posibilidad de mover los datos a otro disco.
 - `/configurar` reabre el asistente con `sobrescribir=True` y confirmación.
 - Las altas y ediciones piden confirmación antes de escribir.
 
+## Fase 8 — Completada
+
+### Completado
+
+- **8.1** — `ActividadDia` en `domain.py` (todos los campos opcionales) y
+  `RegistroDiario.actividad_dia`. 8 tests.
+- **8.2** — Serialización de `actividad_dia` en `Vault` como `dia_<campo>`
+  en frontmatter. 6 tests.
+- **8.3** — `calcular_tdee_dia` en `metabolic.py`: prioriza `actividad_dia`,
+  cae a `actividad_habitual` marcando `PARCIAL`, `DESCONOCIDO` si no hay
+  ni una ni otra. 9 tests.
+- **8.4** — `calcular_balance` usa `calcular_tdee_dia`. El balance es
+  `CALCULADO` si el TDEE es calculado (día), `PARCIAL` si usó la habitual.
+  10 tests entre `test_nutrition_balance.py` y `test_nutrition_balance_dia.py`.
+- **8.5** — Operación `registrar_actividad` en el agente, con confirmación
+  solo si ya hay actividad del día. Muestra TDEE y balance tras registrar.
+- **8.8** — `app/_smoke_fase8.py`: humo real. Exit 0. Balance calculado
+  con actividad del día (TDEE 2962.7 kcal para 12000 pasos + 60 min gym).
+
+### Reglas fijadas
+
+- Actividad del día > actividad habitual > nada.
+- Si se usa la habitual, el balance es `PARCIAL` y se nota.
+- `registrar_actividad` no pide confirmación la primera vez; sí si
+  sobrescribe actividad existente.
+- El agente nunca inventa valores: los campos que el usuario no dé
+  quedan `None`.
+
 ## Siguiente
 
-- Fase 8 — Actividad diaria y gasto energético.
+- Fase 9 — Reportes diarios, semanales y mensuales.
+- Fase 10 — Distribución (PyInstaller, Inno Setup, GitHub Releases).
+
+## Siguiente
+
 - Fase 9 — Reportes.
 - Fase 10 — Distribución.
 
@@ -158,3 +190,5 @@ La bóveda queda lista para que el usuario configure su perfil real con
 - Actividad habitual guardada como referencia inicial.
 - La actividad diaria real se añadirá en Fase 8 (el balance usará la
   actividad del día cuando exista, y solo caerá a la referencia si no).
+
+

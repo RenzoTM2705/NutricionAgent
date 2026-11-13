@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from app.models.domain import (
+    ActividadDia,
     ActividadHabitual,
     Alimento,
     IngredienteReceta,
@@ -473,6 +474,12 @@ class Vault:
                     act_fields[k[len("actividad_"):]] = meta.pop(k)
             actividad = ActividadHabitual(**act_fields) if act_fields else None
 
+            dia_fields: dict[str, Any] = {}
+            for k in list(meta.keys()):
+                if k.startswith("dia_"):
+                    dia_fields[k[len("dia_"):]] = meta.pop(k)
+            actividad_dia = ActividadDia(**dia_fields) if dia_fields else None
+
             observaciones = meta.pop("observaciones", None)
             meta.pop("tipo", None)
             if meta:
@@ -489,6 +496,7 @@ class Vault:
                 fecha=d,
                 items=items,
                 actividad=actividad,
+                actividad_dia=actividad_dia,
                 observaciones=observaciones,
             )
         except VaultError:
@@ -511,6 +519,9 @@ class Vault:
             if reg.actividad is not None:
                 for k, v in reg.actividad.model_dump(exclude_none=True).items():
                     meta[f"actividad_{k}"] = v
+            if reg.actividad_dia is not None:
+                for k, v in reg.actividad_dia.model_dump(exclude_none=True).items():
+                    meta[f"dia_{k}"] = v
 
             body_lines: list[str] = [f"# Registro {reg.fecha.isoformat()}", ""]
             for idx, item in enumerate(reg.items, start=1):

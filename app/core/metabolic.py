@@ -8,8 +8,7 @@ from __future__ import annotations
 from typing import Optional
 
 from app.core.results import Fuente, TDEEEstimado
-from app.models.domain import ActividadHabitual, Perfil, Sexo
-
+from app.models.domain import ActividadDia, ActividadHabitual, Perfil, Sexo
 
 def calcular_bmr(perfil: Perfil) -> TDEEEstimado:
     """Mifflin-St Jeor.
@@ -135,5 +134,127 @@ def calcular_tdee(perfil: Perfil, act: ActividadHabitual) -> TDEEEstimado:
         factor_actividad=factor,
         tdee_kcal=bmr_res.bmr_kcal * factor,
         fuente=Fuente.CALCULADO,
+        notas=notas,
+    )
+
+def _factor_actividad_dia(act: ActividadDia) -> tuple[Optional[float], list[str]]:
+    """Deriva un factor de actividad a partir de los datos del día.
+
+    Reglas conservadoras, en orden. No inventa nivel alto si faltan datos.
+    """
+    notas: list[str] = []
+    gim = bool(act.gimnasio) if act.gimnasio is not None else False
+    dur = act.gimnasio_duracion_min
+    pasos = act.pasos
+    h_trab = act.horas_trabajo
+    h_pie = act.horas_de_pie
+
+    if gim and (dur is not None and dur >= 60) and (pasos is not None and pasos >= 10000):
+        notas.append(
+            f"Factor 1.725: gimnasio {dur} min y {pasos} pasos."
+        )
+        return 1.725, notas
+    if (pasos is not None and pasos >= 10000) or (
+        gim and dur is not None and dur >= 45
+    ):
+        partes: list[str] = []
+        if pasos is not None and pasos >= 10000:
+            partes.append(f"{pasos} pasos")
+        if gim and dur is not None and dur >= 45:
+            partes.append(f"gimnasio {dur} min")
+        notas.append(f"Factor 1.55: {', '.join(partes)}.")
+        return 1.55, notas
+    if gim or (pasos is not None and pasos >= 8000):
+        partes = []
+        if gim:
+            partes.append("gimnasio")
+        if pasos is not None and pasos >= 8000:
+            partes.append(f"{pasos} pasos")
+        notas.append(f"Factor 1.375: {', '.join(partes)}.")
+        return 1.375, notas
+    if h_trab is not None and h_trab >= 6 and h_pie is not None and h_pie >= 4:
+        notas.append(f"Factor 1.375: {h_trab} h trabajo y {h_pie} h de pie.")
+        return 1.375, notas
+    if h_trab is not None and h_trab >= 4 and h_pie is not None and h_pie >= 2:
+        notas.append(f"Factor 1.375: {h_trab} h trabajo y {h_pie} h de pie.")
+        return 1.375, notas
+    if any(
+        v is not None
+        for v in (act.horas_trabajo, act.horas_de_pie, act.pasos, act.gimnasio)
+    ):
+        notas.append(
+            "Factor 1.2: datos del día insuficientes para un nivel superior. "
+            "Se asume sedentario de forma conservadora."
+        )
+        return 1.2, notas
+    return None, ["Sin datos de actividad del día."]
+
+
+def calcular_tdee_dia(
+    perfil: Perfil,
+    actividad_habitual: Optional[ActividadHabitual] = None,
+    actividad_dia: Optional[ActividadDia] = None,
+) -> TDEEEstimado:
+    """TDEE usando actividad del día si existe, si no la habitual.
+
+    - Actividad del día -> factor diario, fuente CALCULADO.
+    - Sin día pero con habitual -> factor habitual, fuente PARCIAL + nota.
+    - Sin ninguna -> fuente DESCONOCIDO.
+    - BMR siempre desde perfil; si no se puede, fuente PARCIAL/DESCONOCIDO.
+    """
+    bmr_res = calcular_bmr(perfil)
+    notas = list(bmr_res.notas)
+
+    factor: Optional[float] = None
+    fuente_actividad: Optional[Fuente] = None
+
+    if actividad_dia is not None:
+        factor, notas_dia = _factor_actividad_dia(actividad_dia)
+        notas.extend(notas_dia)
+        if factor is not None:
+            fuente_actividad = Fuente.CALCULADO
+    elif actividad_habitual is not None:
+        factor, notas_hab = factor_actividad(actividad_habitual)
+        notas.extend(notas_hab)
+        if factor is not None:
+            notas.append("Usando actividad habitual (no del día).")
+            fuente_actividad = Fuente.PARCIAL
+
+    if bmr_res.bmr_kcal is None and factor is None:
+        return TDEEEstimado(
+            bmr_kcal=None,
+            factor_actividad=None,
+            tdee_kcal=None,
+            fuente=Fuente.DESCONOCIDO,
+            notas=notas,
+        )
+    if bmr_res.bmr_kcal is None:
+        return TDEEEstimado(
+            bmr_kcal=None,
+            factor_actividad=factor,
+            tdee_kcal=None,
+            fuente=Fuente.PARCIAL,
+            notas=notas,
+        )
+    if factor is None:
+        return TDEEEstimado(
+            bmr_kcal=bmr_res.bmr_kcal,
+            factor_actividad=None,
+            tdee_kcal=None,
+            fuente=Fuente.PARCIAL,
+            notas=notas,
+        )
+
+    # Ambos existen
+    if fuente_actividad == Fuente.CALCULADO:
+        fuente = Fuente.CALCULADO
+    else:
+        fuente = Fuente.PARCIAL
+
+    return TDEEEstimado(
+        bmr_kcal=bmr_res.bmr_kcal,
+        factor_actividad=factor,
+        tdee_kcal=bmr_res.bmr_kcal * factor,
+        fuente=fuente,
         notas=notas,
     )
