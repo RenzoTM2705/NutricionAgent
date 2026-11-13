@@ -96,6 +96,23 @@ data/ (bóveda y backups) está excluido de Git.
 
 No se envían datos a servicios externos.
 
-## Licencia
+## Instalación para usuarios finales (Windows)
 
-Por definir.
+1. Descarga `NutricionAgent-Setup-X.Y.Z.exe` desde GitHub Releases.
+2. Ejecuta el instalador. Por defecto se instala en `%LOCALAPPDATA%\Programs\NutricionAgent\`, pero puedes cambiar la carpeta.
+3. Si no tienes Ollama, instálalo: https://ollama.com/download/windows
+4. Descarga el modelo recomendado: ollama pull qwen3:4b-instruct-2507-q4_K_M
+5. Abre NutricionAgent desde el Menú Inicio o el escritorio.
+6. Completa el asistente.
+
+### Dónde están tus datos
+
+- Datos del usuario: `%LOCALAPPDATA%\NutricionAgent\data\vault\` (bóveda Markdown).
+- Configuración: `%LOCALAPPDATA%\NutricionAgent\.env`.
+- Backups: `%LOCALAPPDATA%\NutricionAgent\data\backups\`.
+
+Al desinstalar, el instalador pregunta si quieres borrar tus datos. Por defecto, no.
+
+### Modo “solo memoria”
+
+Si Ollama no está instalado o no responde, la app ofrece continuar sin IA. Puedes registrar comidas y actividad; el cálculo funciona igual. Cuando instales Ollama, la IA se habilita.

@@ -1,194 +1,180 @@
 # Estado de NutricionAgent
 
-Última actualización: Fase 4 completada.
+Última actualización: Fase 10 en curso (10.1–10.3 completadas).
 
 ## Entorno
 
 - Proyecto: E:\Proyectos\NutricionAgent
-- Bóveda: E:\Proyectos\NutricionAgent\data\vault
-- Backups: E:\Proyectos\NutricionAgent\data\backups
+- Bóveda desarrollo: E:\Proyectos\NutricionAgent\data\vault
+- Bóveda ejecutable: %LOCALAPPDATA%\NutricionAgent\data\vault
+- Backups: <data_dir>.parent\backups
 - Modelos Ollama: E:\Ollama\models (variable OLLAMA_MODELS)
 - Modelo activo: qwen3:4b-instruct-2507-q4_K_M (2.5 GB, Q4_K_M)
 - Python: 3.12.10 en .venv
 - Ollama: 0.40.16
+- PyInstaller: 6.x
+- Inno Setup: 6.x (pendiente de confirmar instalación)
 
 ## Fases completadas
 
-- Fase 1: estructura portable, venv, .env, .gitignore, bóveda inicial, Git.
-- Fase 2: app/ollama_client.py, app/config.py, app/errors.py. 20 tests.
-- Fase 3: app/models/domain.py, app/storage/{fs,frontmatter,vault}.py. 92 tests.
-- Fase 4: app/core/{results,errors,units,nutrition,metabolic}.py. 157 tests.
-- Fase 5 — En curso
+### Fase 1 — Estructura portable
+Estructura de carpetas, venv, .env, .env.example, .gitignore,
+bóveda inicial, Git. Sin tests.
 
-## Fase 5 — Completada
+### Fase 2 — Cliente Ollama (20 tests)
+`app/ollama_client.py`, `app/config.py`, `app/errors.py`.
+Conexión, ping, versión, listado de modelos, selección, prueba de
+respuesta y JSON estructurado.
 
-### Completado
+### Fase 3 — Sistema de memoria (92 tests)
+`app/models/domain.py`, `app/storage/{fs,frontmatter,vault}.py`.
+Modelos Pydantic, escritura atómica, backups con retención,
+parser de frontmatter, Vault para perfil, objetivos, actividad,
+alimentos, recetas y registro diario.
 
-- **5.1** — `app/setup/wizard.py`: lógica pura del asistente (`SetupInput`, `SetupResult`, `SetupError`, `aplicar_setup`, `perfil_existente`). 13 tests.
-- **5.2** — `app/setup/console.py`: capa Rich, sin tests automáticos; verificada vía 5.4 y 5.6.
-- **5.3** — `app/setup/checks.py`: estado de Ollama, prueba de modelo, mensajes al usuario. 10 tests.
-- **5.4** — `app/main.py`: detecta perfil, lanza asistente si no hay, mensaje breve si hay. Probado con bóveda temporal.
-- **5.5** — Omitida (tests de consola con mocks considerados frágiles; cobertura vía 5.6).
-- **5.6** — `app/_smoke_setup.py`: flujo completo con Ollama real y bóveda temporal. Exit 0.
+### Fase 4 — Motor nutricional (157 tests)
+`app/core/{results,errors,units,nutrition,metabolic}.py`.
+Conversión de unidades, cálculo por item, totales diarios, recetas,
+BMR (Mifflin-St Jeor), factor de actividad, TDEE y balance.
+Regla estricta: nutrientes desconocidos = None, nunca 0.
 
-## Fase 6 — Completada
+### Fase 5 — Asistente de configuración inicial
+- `app/setup/wizard.py`: lógica pura. 13 tests.
+- `app/setup/console.py`: capa Rich.
+- `app/setup/checks.py`: estado de Ollama y mensajes. 10 tests.
+- `app/main.py`: detecta perfil y lanza asistente o bucle.
+- `app/_smoke_setup.py`: humo real. Exit 0.
 
-### Completado
+### Fase 6 — Agente conversacional
+- `app/agent/tools.py`: herramientas puras. 10 tests.
+- `app/agent/operations.py`: operaciones validadas con Pydantic. 20 tests.
+- `app/agent/interpreter.py`: lenguaje natural → operación. 8 tests.
+- `app/agent/loop.py`: bucle conversacional. 6 tests.
+- `app/_smoke_agent.py`: humo real. Exit 0.
 
-- **6.1** — `app/agent/tools.py`: herramientas puras de dominio
-  (`agregar_item`, `agregar_item_receta`, `eliminar_item_por_indice`,
-  `listar_items`, `totales`, `buscar_alimentos`). 10 tests.
-- **6.2** — `app/agent/operations.py`: 7 tipos de operación validados con
-  Pydantic (`agregar_item`, `agregar_receta`, `eliminar_item`,
-  `consultar_totales`, `listar_items`, `consultar_alimentos`,
-  `responder`), `parsear_fecha`. 20 tests.
-- **6.3** — `app/agent/interpreter.py`: lenguaje natural → operación
-  validada. `_SISTEMA_PROMPT` con esquema, contexto dinámico (fecha,
-  perfil, alimentos, recetas, totales), reintento único, escape a
-  `responder`. 8 tests.
-- **6.4** — `app/agent/loop.py`: bucle conversacional con Rich,
-  `/hoy`, `/ayuda`, `/salir`, persistencia condicional, manejo de
-  errores. 6 tests.
-- **6.7** — `app/_smoke_agent.py`: humo real contra Ollama y bóveda
-  temporal. Exit 0.
+**Incidencia corregida:** `interpretar` no incluía `_SISTEMA_PROMPT`;
+el modelo devolvía JSON reflejando el contexto. Corregido.
 
-### Incidencia corregida
+### Fase 7 — Comandos, edición e integración con main
+- `main.py` entra al bucle si hay perfil.
+- Comandos: `/hoy`, `/perfil`, `/objetivos`, `/actividad`,
+  `/alimentos`, `/recetas`, `/modelo`, `/configurar`, `/ayuda`, `/salir`.
+- Comandos desconocidos (`/...`) se rechazan sin llamar al modelo.
+- Alta de alimentos (`AltaAlimentoOp`) con confirmación.
+- Edición de items (`EditarItemOp`) con confirmación.
+- `app/_smoke_fase7.py`: humo real. Exit 0.
 
-`interpretar` no incluía `_SISTEMA_PROMPT` en el prompt enviado al
-modelo, solo el contexto. El modelo devolvía JSON reflejando el
-contexto en lugar de la operación. Corregido anteponiendo el esquema
-y envolviendo el contexto entre marcadores.
+**Incidencia corregida:** `main.py` usaba `root_for_backup = project_root / "data"`
+fijo. Cambiado a `data_dir.parent` para soportar bóvedas fuera del proyecto.
 
-### Reglas fijadas
+### Fase 8 — Actividad del día y balance real
+- `ActividadDia` en `domain.py` y `RegistroDiario.actividad_dia`. 8 tests.
+- Serialización `dia_<campo>` en `Vault`. 6 tests.
+- `calcular_tdee_dia` en `metabolic.py`. 9 tests.
+- `calcular_balance` usa `calcular_tdee_dia`. 10 tests.
+- Operación `registrar_actividad` en el agente, con confirmación
+  solo al sobrescribir.
+- `app/_smoke_fase8.py`: humo real. Exit 0.
 
-- Sin búsqueda externa. Todo vive en la bóveda.
-- Si el alimento no existe, el agente responde con `responder` y
-  sugiere darlo de alta (Fase 7).
-- El modelo nunca decide la fecha “porque sí”: si la incluye, es
-  porque el usuario la mencionó; el bucle la valida con `parsear_fecha`.
+### Fase 9 — Reportes
+- `app/core/report_models.py`: modelos de reporte. 9 tests.
+- `app/core/reports.py`: generación diaria, semanal, mensual. 8 tests.
+- `Vault`: `write_reporte_*` / `read_reporte_*`. 8 tests.
+- Comandos `/reporte`, `/reporte-semana`, `/reporte-mes`. 3 tests.
+- `app/_smoke_fase9.py`: humo real. Exit 0.
 
-## Fase 7 — Completada
-
-### Completado
-
-- **7.1** — `main.py` entra al bucle si hay perfil; si no, asistente y luego bucle.
-- **7.2** — Comandos locales en el bucle: `/hoy`, `/perfil`, `/objetivos`,
-  `/actividad`, `/alimentos`, `/recetas`, `/modelo`, `/configurar`, `/ayuda`,
-  `/salir`. Comandos desconocidos (`/...`) se rechazan sin llamar al modelo.
-- **7.3** — Alta de alimentos conversacional (`AltaAlimentoOp`) con confirmación.
-- **7.4** — Edición de items (`EditarItemOp`: cantidad, unidad, etiqueta)
-  con confirmación.
-- **7.6** — `app/_smoke_fase7.py`: humo real completo. Exit 0.
-
-### Incidencia corregida
-
-`main.py` usaba `root_for_backup = project_root / "data"` fijo, lo que rompía
-`backup_file` cuando `NUTRICIONAGENT_DATA_DIR` apuntaba fuera del proyecto.
-Corregido a `root_for_backup = data_dir.parent`, coherente con la bóveda
-temporal y con la posibilidad de mover los datos a otro disco.
-
-### Notas
-
-- `/modelo` cambia el modelo solo en memoria; `.env` no se modifica.
-- `/configurar` reabre el asistente con `sobrescribir=True` y confirmación.
-- Las altas y ediciones piden confirmación antes de escribir.
-
-## Fase 8 — Completada
+## Fase 10 — Distribución (en curso)
 
 ### Completado
 
-- **8.1** — `ActividadDia` en `domain.py` (todos los campos opcionales) y
-  `RegistroDiario.actividad_dia`. 8 tests.
-- **8.2** — Serialización de `actividad_dia` en `Vault` como `dia_<campo>`
-  en frontmatter. 6 tests.
-- **8.3** — `calcular_tdee_dia` en `metabolic.py`: prioriza `actividad_dia`,
-  cae a `actividad_habitual` marcando `PARCIAL`, `DESCONOCIDO` si no hay
-  ni una ni otra. 9 tests.
-- **8.4** — `calcular_balance` usa `calcular_tdee_dia`. El balance es
-  `CALCULADO` si el TDEE es calculado (día), `PARCIAL` si usó la habitual.
-  10 tests entre `test_nutrition_balance.py` y `test_nutrition_balance_dia.py`.
-- **8.5** — Operación `registrar_actividad` en el agente, con confirmación
-  solo si ya hay actividad del día. Muestra TDEE y balance tras registrar.
-- **8.8** — `app/_smoke_fase8.py`: humo real. Exit 0. Balance calculado
-  con actividad del día (TDEE 2962.7 kcal para 12000 pasos + 60 min gym).
+- **10.1** — `docs/DISTRIBUCION.md`: diseño del empaquetado.
+  `requirements-dev.txt` con PyInstaller.
+- **10.2** — `app/config.py` adaptado a modo congelado:
+  - Detecta `sys.frozen` y `sys._MEIPASS`.
+  - `data_dir`: `%LOCALAPPDATA%\NutricionAgent\data\vault` por defecto
+    en modo congelado. `NUTRICIONAGENT_DATA_DIR` sigue teniendo prioridad.
+  - `.env`: `%LOCALAPPDATA%\NutricionAgent\.env`, creado desde
+    `.env.example` la primera vez.
+  - `backup_root = data_dir.parent / "backups"`.
+- **10.3** — PyInstaller:
+  - `nutricionagent.spec` (onedir, console=True, sin UPX).
+  - `run.py` como entry point.
+  - Ejecutable generado en `dist/NutricionAgent/`.
+  - Probado en local: arranca, asistente, perfil guardado en
+    `%LOCALAPPDATA%\NutricionAgent\data\vault\01-Perfil\perfil.md`,
+    `.env` creado a partir de `.env.example`.
 
-### Reglas fijadas
+### Pendiente
 
-- Actividad del día > actividad habitual > nada.
-- Si se usa la habitual, el balance es `PARCIAL` y se nota.
-- `registrar_actividad` no pide confirmación la primera vez; sí si
-  sobrescribe actividad existente.
-- El agente nunca inventa valores: los campos que el usuario no dé
-  quedan `None`.
+- **10.4** — Inno Setup: `installer.iss`, instalador por usuario,
+  accesos directos, aviso de Ollama, preservación de datos.
+- **10.5** — GitHub Releases: plantilla de release, checksum,
+  workflow opcional.
+- **10.6** — Prueba en máquina limpia.
+- **10.7** — Commit de Fase 10 y cierre de `docs/ESTADO.md`.
 
-## Siguiente
+## Reglas fijadas (todas las fases)
 
-- Fase 9 — Reportes diarios, semanales y mensuales.
-- Fase 10 — Distribución (PyInstaller, Inno Setup, GitHub Releases).
-
-## Siguiente
-
-- Fase 9 — Reportes.
-- Fase 10 — Distribución.
-
-## Reglas fijadas
-
-- Nutrientes desconocidos: None, nunca 0.
+- Nutrientes desconocidos: `None`, nunca `0`.
 - Fuente explícita: calculado, estimado, parcial, desconocido, pendiente.
-- Recetas: si un ingrediente no aporta un nutriente, el total de ese nutriente es None y la fuente es PARCIAL.
+- Recetas: si un ingrediente no aporta un nutriente, el total de ese
+  nutriente es `None` y la fuente es `PARCIAL`.
 - No se inventan densidades g↔ml; requiere que el alimento lo declare.
 - El motor no escribe en la bóveda; solo lee y calcula.
 - El motor no redondea; devuelve floats.
 - Registro diario: lista plana de items (sin desayuno/almuerzo/cena).
-- BMR: Mifflin-St Jeor. Factores de actividad estándar 1.2/1.375/1.55/1.725/1.9.
-- .env y data/ excluidos de Git. Nunca commitear datos personales.
+- BMR: Mifflin-St Jeor. Factores de actividad 1.2 / 1.375 / 1.55 / 1.725.
+- Actividad del día > actividad habitual > nada. Si se usa la habitual,
+  el balance es `PARCIAL` y se nota.
+- Sin búsqueda externa. Todo vive en la bóveda.
+- El modelo nunca decide la fecha “porque sí”: si la incluye, es porque
+  el usuario la mencionó; el bucle la valida con `parsear_fecha`.
+- `.env` y `data/` excluidos de Git. Nunca commitear datos personales.
+- Días sin datos no cuentan como 0 en promedios de reportes.
+- Si falta un nutriente en algún día con datos, el promedio es `None`.
+- Comparación con periodo anterior solo si hay datos del anterior.
+- Peso histórico: no disponible. Los reportes lo indican.
 
 ## Git
 
-- Ramas: main, develop, feat/configuracion-ollama, feat/configuracion-contexto-md
-- Commits: Fase 1, Fase 2, Fase 3, Fase 4.
-- Remoto: origin (GitHub) con main y develop. Las ramas feat aún no se han subido.
+- Ramas: `main`, `develop`, `feat/configuracion-ollama`,
+  `feat/configuracion-contexto-md`, `feat/configuracion-inicial`,
+  `feat/validar-logica`.
+- Commits: Fases 1–9 cerradas, cada una con su commit.
+- Remoto: `origin` (GitHub) con `main` y `develop`. Las ramas `feat/*`
+  aún no se han subido.
+- Pendiente: commit de Fase 10 cuando el instalador esté probado.
 
+## Incidencias corregidas (histórico)
 
-- Fase 8: actividad y gasto.
-- Fase 9: reportes.
-- Fase 10: distribución.
-- 
-## Limpieza previa a perfil real
+- **Perfil vacío rompía el arranque.** `Vault.read_perfil` construía
+  `Perfil(**meta)` sin filtrar `tipo`/`version` y sin datos mínimos.
+  Fix: filtra claves y devuelve `None` si faltan `edad`, `peso_kg`,
+  `altura_cm`. Tests en `tests/test_vault_perfil_vacio.py`.
+- **`main` usaba `root_for_backup` fijo.** Rompía bóvedas fuera del
+  proyecto. Fix: `data_dir.parent`.
+- **`interpretar` no enviaba el esquema al modelo.** El modelo reflejaba
+  el contexto. Fix: anteponer `_SISTEMA_PROMPT` y envolver contexto.
+- **Rama `RegistrarActividadOp` mal colocada** dentro de
+  `_confirmar_registrar_actividad` (después del `return`). Movida a
+  `_ejecutar_operacion`.
+- **`write_registro` perdió el bloque `actividad`** al añadir
+  `actividad_dia`. Restaurado. Ambos coexisten en el frontmatter.
+- **`test_balance_calculado` y `test_flujo_completo`** esperaban
+  `CALCULADO` con actividad habitual. Actualizados a `PARCIAL`.
 
-Tras cerrar la Fase 5, se han eliminado los datos de ejemplo generados por
-los scripts de humo (`_smoke_ollama`, `_smoke_vault`, `_smoke_setup`):
+## Próximos pasos tras Fase 10
 
-- Registros de ejemplo en `data/vault/03-Registros/`.
-- Alimentos, recetas y perfil de ejemplo en `data/vault/01-Perfil/` y
-  `data/vault/02-Alimentos/` (restaurados a su contenido mínimo original).
-- Logs y backups en `data/backups/`.
+- Firma de código (code signing) con certificado comercial.
+- Auto-update.
+- Distribución Linux/macOS.
+- Integración opcional con Obsidian (no necesaria: los archivos ya son
+  Markdown).
 
-La bóveda queda lista para que el usuario configure su perfil real con
-`python -m app.main`. No se ha tocado Git: `data/` sigue fuera del repo.
+## Limpieza y datos de ejemplo
 
-## Incidente: perfil vacío rompía el arranque
-
-- **Síntoma:** `python -m app.main` fallaba con `VaultError` al leer
-  `data/vault/01-Perfil/perfil.md` cuando el archivo existía pero solo
-  tenía frontmatter (`tipo: perfil`, `version: 1`) sin datos.
-- **Causa:** `Vault.read_perfil()` construía `Perfil(**meta)` sin filtrar
-  las claves de frontmatter ajenas al modelo, y `Perfil` exige `edad`,
-  `peso_kg`, `altura_cm` y prohíbe extras.
-- **Fix:**
-  - `Vault._read_typed` filtra `tipo` y `version` antes de construir.
-  - `Vault.read_perfil` devuelve `None` si faltan `edad`, `peso_kg` o
-    `altura_cm` (perfil no configurado), y lanza `VaultError` si los tres
-    están pero son inválidos.
-- **Tests:** `tests/test_vault_perfil_vacio.py` (3 nuevos). Se ajustó
-  `test_read_corrupt_file_raises_vault_error` para usar un perfil
-  completo pero inválido.
-
-## Estado tras Fase 5
-
-- Perfil real configurado por el usuario con `python -m app.main`.
-- Actividad habitual guardada como referencia inicial.
-- La actividad diaria real se añadirá en Fase 8 (el balance usará la
-  actividad del día cuando exista, y solo caerá a la referencia si no).
-
-
+- Los datos de ejemplo de los scripts de humo se eliminaron tras Fase 5.
+- `data/` real del proyecto contiene el perfil del usuario y los datos
+  que haya generado. No se versiona.
+- `%LOCALAPPDATA%\NutricionAgent\` contiene los datos del ejecutable.
+  No se versiona.

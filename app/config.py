@@ -10,20 +10,54 @@ Reglas:
 from __future__ import annotations
 
 import os
+import sys
 from functools import lru_cache
 from pathlib import Path
 
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field, field_validator
 
+# --- Detección portable de la raíz del proyecto o del bundle ---
+# En desarrollo, este archivo vive en <raíz>/app/config.py (parents[1] = raíz).
+# Congelado con PyInstaller, los recursos se extraen a sys._MEIPASS.
+_IS_FROZEN: bool = bool(getattr(sys, "frozen", False))
+if _IS_FROZEN:
+    PROJECT_ROOT: Path = Path(sys._MEIPASS)  # type: ignore[attr-defined]
+else:
+    PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
-# --- Detección portable de la raíz del proyecto ---
-# Este archivo vive en <raíz>/app/config.py.
-# parents[1] = <raíz>.
-PROJECT_ROOT: Path = Path(__file__).resolve().parents[1]
 
-# Cargar .env desde la raíz, si existe. No es obligatorio.
-_ENV_FILE = PROJECT_ROOT / ".env"
+def _appdata_dir() -> Path:
+    """Directorio de datos del usuario en Windows: %LOCALAPPDATA%\\NutricionAgent."""
+    local = os.getenv("LOCALAPPDATA")
+    if local:
+        return Path(local) / "NutricionAgent"
+    # Fallback razonable para otros SO (no soportado en esta fase)
+    home = Path.home()
+    return home / ".local" / "share" / "NutricionAgent"
+
+
+def _resolve_env_file() -> Path:
+    """Devuelve la ruta del .env activo.
+
+    - Si estamos congelados: %LOCALAPPDATA%/NutricionAgent/.env.
+      Si no existe, se crea a partir de PROJECT_ROOT/.env.example.
+    - Si no: PROJECT_ROOT/.env.
+    """
+    if _IS_FROZEN:
+        target = _appdata_dir() / ".env"
+        if not target.exists():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            ejemplo = PROJECT_ROOT / ".env.example"
+            if ejemplo.exists():
+                target.write_text(
+                    ejemplo.read_text(encoding="utf-8"), encoding="utf-8"
+                )
+        return target
+    return PROJECT_ROOT / ".env"
+
+
+_ENV_FILE = _resolve_env_file()
 if _ENV_FILE.exists():
     load_dotenv(_ENV_FILE, override=False)
 
@@ -32,16 +66,19 @@ def _resolve_data_dir() -> Path:
     """Resuelve la ruta de datos del usuario.
 
     Prioridad:
-    1. NUTRICIONAGENT_DATA_DIR (absoluta o relativa a PROJECT_ROOT).
-    2. PROJECT_ROOT/data/vault
+    1. NUTRICIONAGENT_DATA_DIR (absoluta, o relativa a la raíz del proyecto).
+    2. Modo congelado: %LOCALAPPDATA%/NutricionAgent/data/vault
+    3. Modo desarrollo: PROJECT_ROOT/data/vault
     """
     raw = os.getenv("NUTRICIONAGENT_DATA_DIR", "").strip()
-    if not raw:
-        return PROJECT_ROOT / "data" / "vault"
-    p = Path(raw).expanduser()
-    if not p.is_absolute():
-        p = (PROJECT_ROOT / p).resolve()
-    return p
+    if raw:
+        p = Path(raw).expanduser()
+        if not p.is_absolute():
+            p = (PROJECT_ROOT / p).resolve()
+        return p
+    if _IS_FROZEN:
+        return _appdata_dir() / "data" / "vault"
+    return PROJECT_ROOT / "data" / "vault"
 
 
 class OllamaSettings(BaseModel):
