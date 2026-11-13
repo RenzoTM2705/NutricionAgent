@@ -31,9 +31,46 @@
 - **5.5** — Omitida (tests de consola con mocks considerados frágiles; cobertura vía 5.6).
 - **5.6** — `app/_smoke_setup.py`: flujo completo con Ollama real y bóveda temporal. Exit 0.
 
-## Fase 6 — Pendiente
+## Fase 6 — Completada
 
-- Registro diario vía agente.
+### Completado
+
+- **6.1** — `app/agent/tools.py`: herramientas puras de dominio
+  (`agregar_item`, `agregar_item_receta`, `eliminar_item_por_indice`,
+  `listar_items`, `totales`, `buscar_alimentos`). 10 tests.
+- **6.2** — `app/agent/operations.py`: 7 tipos de operación validados con
+  Pydantic (`agregar_item`, `agregar_receta`, `eliminar_item`,
+  `consultar_totales`, `listar_items`, `consultar_alimentos`,
+  `responder`), `parsear_fecha`. 20 tests.
+- **6.3** — `app/agent/interpreter.py`: lenguaje natural → operación
+  validada. `_SISTEMA_PROMPT` con esquema, contexto dinámico (fecha,
+  perfil, alimentos, recetas, totales), reintento único, escape a
+  `responder`. 8 tests.
+- **6.4** — `app/agent/loop.py`: bucle conversacional con Rich,
+  `/hoy`, `/ayuda`, `/salir`, persistencia condicional, manejo de
+  errores. 6 tests.
+- **6.7** — `app/_smoke_agent.py`: humo real contra Ollama y bóveda
+  temporal. Exit 0.
+
+### Incidencia corregida
+
+`interpretar` no incluía `_SISTEMA_PROMPT` en el prompt enviado al
+modelo, solo el contexto. El modelo devolvía JSON reflejando el
+contexto en lugar de la operación. Corregido anteponiendo el esquema
+y envolviendo el contexto entre marcadores.
+
+### Reglas fijadas
+
+- Sin búsqueda externa. Todo vive en la bóveda.
+- Si el alimento no existe, el agente responde con `responder` y
+  sugiere darlo de alta (Fase 7).
+- El modelo nunca decide la fecha “porque sí”: si la incluye, es
+  porque el usuario la mencionó; el bucle la valida con `parsear_fecha`.
+
+## Siguiente
+
+- Fase 7 — Comandos y edición (`/perfil`, `/modelo`, `/objetivos`,
+  `/actividad`, `/alimentos`, alta de alimentos, edición de items).
 
 ## Reglas fijadas
 
@@ -53,9 +90,7 @@
 - Commits: Fase 1, Fase 2, Fase 3, Fase 4.
 - Remoto: origin (GitHub) con main y develop. Las ramas feat aún no se han subido.
 
-## Pendiente
 
-- Fase 6: registro diario vía agente.
 - Fase 7: agente conversacional.
 - Fase 8: actividad y gasto.
 - Fase 9: reportes.
