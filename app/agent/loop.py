@@ -17,6 +17,12 @@ from rich.table import Table
 from app.agent.operations import AltaAlimentoOp, EditarItemOp
 from app.models.domain import Alimento, ItemComida
 
+from app.core.reports import (
+    generar_reporte_diario,
+    generar_reporte_mensual,
+    generar_reporte_semanal,
+)
+
 from app.setup.console import (
     confirmar_o_editar,
     preguntar_actividad,
@@ -65,16 +71,19 @@ from app.storage.vault import Vault, VaultError
 
 _AYUDA = """\
 Comandos:
-  /hoy          Ver items y totales del día.
-  /perfil       Mostrar el perfil actual.
-  /objetivos    Mostrar los objetivos.
-  /actividad    Mostrar la actividad habitual.
-  /alimentos    Listar alimentos de la bóveda.
-  /recetas      Listar recetas de la bóveda.
-  /modelo       Ver o cambiar el modelo activo (solo sesión).
-  /configurar   Reabrir el asistente de configuración.
-  /ayuda        Mostrar esta ayuda.
-  /salir        Salir.
+  /hoy              Ver items y totales del día.
+  /reporte          Generar reporte diario de hoy (Markdown).
+  /reporte-semana   Generar reporte de los últimos 7 días.
+  /reporte-mes      Generar reporte del mes actual.
+  /perfil           Mostrar el perfil actual.
+  /objetivos        Mostrar los objetivos.
+  /actividad        Mostrar la actividad habitual.
+  /alimentos        Listar alimentos de la bóveda.
+  /recetas          Listar recetas de la bóveda.
+  /modelo           Ver o cambiar el modelo activo (solo sesión).
+  /configurar       Reabrir el asistente de configuración.
+  /ayuda            Mostrar esta ayuda.
+  /salir            Salir.
 
 Los comandos empiezan por "/" y deben escribirse exactamente.
 Si escribes algo que empieza por "/" y no es un comando, se avisa sin
@@ -524,6 +533,54 @@ def _manejar_modelo(
     )
     return nuevo_client
 
+def _mostrar_resumen_reporte_diario(console: Console, r) -> None:
+    table = Table(title=f"Reporte diario {r.fecha.isoformat()}")
+    table.add_column("Campo", style="cyan")
+    table.add_column("Valor")
+    table.add_row("Items", str(len(r.items)))
+    for k, v in r.totales.model_dump().items():
+        table.add_row(k, "—" if v is None else f"{v:.1f}")
+    table.add_row("Balance (kcal)", "—" if r.balance.balance_kcal is None else f"{r.balance.balance_kcal:+.1f}")
+    table.add_row("Fuente", r.fuente.value)
+    console.print(table)
+
+
+def _mostrar_resumen_reporte_semanal(console: Console, r) -> None:
+    table = Table(title=f"Reporte semanal {r.desde.isoformat()} → {r.hasta.isoformat()}")
+    table.add_column("Campo", style="cyan")
+    table.add_column("Valor")
+    table.add_row("Días con datos", str(r.dias_con_datos))
+    table.add_row("Días sin datos", str(r.dias_sin_datos))
+    table.add_row("Días entrenados", str(r.dias_entrenados))
+    for k, v in r.promedios.model_dump().items():
+        table.add_row(f"Prom. {k}", "—" if v is None else f"{v:.1f}")
+    table.add_row(
+        "Balance prom. (kcal)",
+        "—" if r.balance_promedio.balance_kcal is None else f"{r.balance_promedio.balance_kcal:+.1f}",
+    )
+    table.add_row("Fuente", r.fuente.value)
+    console.print(table)
+
+
+def _mostrar_resumen_reporte_mensual(console: Console, r) -> None:
+    table = Table(title=f"Reporte mensual {r.desde.isoformat()} → {r.hasta.isoformat()}")
+    table.add_column("Campo", style="cyan")
+    table.add_column("Valor")
+    table.add_row("Días con datos", str(r.dias_con_datos))
+    table.add_row("Días sin datos", str(r.dias_sin_datos))
+    table.add_row("Días entrenados", str(r.dias_entrenados))
+    table.add_row(
+        "Consistencia", "—" if r.consistencia_pct is None else f"{r.consistencia_pct:.1f}%"
+    )
+    for k, v in r.promedios.model_dump().items():
+        table.add_row(f"Prom. {k}", "—" if v is None else f"{v:.1f}")
+    table.add_row(
+        "Balance prom. (kcal)",
+        "—" if r.balance_promedio.balance_kcal is None else f"{r.balance_promedio.balance_kcal:+.1f}",
+    )
+    table.add_row("Fuente", r.fuente.value)
+    console.print(table)
+
 
 def run_loop(vault: Vault, client: OllamaClient, console: Console) -> int:
     """Bucle conversacional. Devuelve código de salida."""
@@ -560,6 +617,38 @@ def run_loop(vault: Vault, client: OllamaClient, console: Console) -> int:
             _mostrar_items(console, registro, vault)
             _mostrar_totales(console, registro, vault)
             continue
+
+        if linea == "/reporte":
+            from datetime import date as _d
+            hoy = _d.today()
+            r = generar_reporte_diario(hoy, vault)
+            path = vault.write_reporte_diario(r)
+            rel = path.relative_to(vault.data_dir)
+            _mostrar_resumen_reporte_diario(console, r)
+            console.print(f"[dim]Guardado en {rel}[/dim]")
+            continue
+
+        if linea == "/reporte-semana":
+            from datetime import date as _d, timedelta as _td
+            hoy = _d.today()
+            desde = hoy - _td(days=6)
+            r = generar_reporte_semanal(desde, hoy, vault)
+            path = vault.write_reporte_semanal(r)
+            rel = path.relative_to(vault.data_dir)
+            _mostrar_resumen_reporte_semanal(console, r)
+            console.print(f"[dim]Guardado en {rel}[/dim]")
+            continue
+
+        if linea == "/reporte-mes":
+            from datetime import date as _d
+            hoy = _d.today()
+            r = generar_reporte_mensual(hoy.year, hoy.month, vault)
+            path = vault.write_reporte_mensual(r)
+            rel = path.relative_to(vault.data_dir)
+            _mostrar_resumen_reporte_mensual(console, r)
+            console.print(f"[dim]Guardado en {rel}[/dim]")
+            continue
+
         if linea == "/perfil":
             p = vault.read_perfil()
             if p is None:
