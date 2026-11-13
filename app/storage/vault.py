@@ -153,14 +153,17 @@ class Vault:
     def recetas_path(self) -> Path:
         return self.data_dir / "02-Alimentos" / "recetas.md"
 
-    # --- helpers internos ---
+        # Claves de frontmatter que no forman parte del modelo y se ignoran al leer.
+    _META_IGNORADAS = {"tipo", "version"}
+
     def _read_typed(self, path: Path, model: type, default: Any = None) -> Any:
         if not path.exists():
             return default
         try:
             text = read_text(path)
             meta, _ = frontmatter.parse(text)
-            return model(**meta)
+            meta_limpio = {k: v for k, v in meta.items() if k not in self._META_IGNORADAS}
+            return model(**meta_limpio)
         except Exception as exc:
             raise VaultError(f"No se pudo leer {path}: {exc}") from exc
 
@@ -177,7 +180,21 @@ class Vault:
 
     # --- perfil ---
     def read_perfil(self) -> Perfil | None:
-        return self._read_typed(self.perfil_path, Perfil)
+        path = self.perfil_path
+        if not path.exists():
+            return None
+        try:
+            text = read_text(path)
+            meta, _ = frontmatter.parse(text)
+            # Si faltan los campos mínimos, el perfil no está configurado.
+            if not all(k in meta for k in ("edad", "peso_kg", "altura_cm")):
+                return None
+            meta_limpio = {k: v for k, v in meta.items() if k not in self._META_IGNORADAS}
+            return Perfil(**meta_limpio)
+        except VaultError:
+            raise
+        except Exception as exc:
+            raise VaultError(f"No se pudo leer {path}: {exc}") from exc
 
     def write_perfil(self, perfil: Perfil) -> Path:
         return self._write_typed(self.perfil_path, perfil)

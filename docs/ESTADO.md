@@ -20,11 +20,6 @@
 - Fase 4: app/core/{results,errors,units,nutrition,metabolic}.py. 157 tests.
 - Fase 5 — En curso
 
-### Completado
-
-- **5.1** — `app/setup/wizard.py`: lógica pura del asistente (`SetupInput`, `SetupResult`, `SetupError`, `aplicar_setup`, `perfil_existente`). 13 tests.
-- `docs/ESTADO.md` actualizado tras cada subtarea.
-
 ## Fase 5 — Completada
 
 ### Completado
@@ -35,10 +30,6 @@
 - **5.4** — `app/main.py`: detecta perfil, lanza asistente si no hay, mensaje breve si hay. Probado con bóveda temporal.
 - **5.5** — Omitida (tests de consola con mocks considerados frágiles; cobertura vía 5.6).
 - **5.6** — `app/_smoke_setup.py`: flujo completo con Ollama real y bóveda temporal. Exit 0.
-
-### Pendiente de Fase 5
-
-Nada. Fase cerrada.
 
 ## Fase 6 — Pendiente
 
@@ -69,3 +60,44 @@ Nada. Fase cerrada.
 - Fase 8: actividad y gasto.
 - Fase 9: reportes.
 - Fase 10: distribución.
+- 
+## Limpieza previa a perfil real
+
+Tras cerrar la Fase 5, se han eliminado los datos de ejemplo generados por
+los scripts de humo (`_smoke_ollama`, `_smoke_vault`, `_smoke_setup`):
+
+- Registros de ejemplo en `data/vault/03-Registros/`.
+- Alimentos, recetas y perfil de ejemplo en `data/vault/01-Perfil/` y
+  `data/vault/02-Alimentos/` (restaurados a su contenido mínimo original).
+- Logs y backups en `data/backups/`.
+
+La bóveda queda lista para que el usuario configure su perfil real con
+`python -m app.main`. No se ha tocado Git: `data/` sigue fuera del repo.
+
+## Incidente: perfil vacío rompía el arranque
+
+- **Síntoma:** `python -m app.main` fallaba con `VaultError` al leer
+  `data/vault/01-Perfil/perfil.md` cuando el archivo existía pero solo
+  tenía frontmatter (`tipo: perfil`, `version: 1`) sin datos.
+- **Causa:** `Vault.read_perfil()` construía `Perfil(**meta)` sin filtrar
+  las claves de frontmatter ajenas al modelo, y `Perfil` exige `edad`,
+  `peso_kg`, `altura_cm` y prohíbe extras.
+- **Fix:**
+  - `Vault._read_typed` filtra `tipo` y `version` antes de construir.
+  - `Vault.read_perfil` devuelve `None` si faltan `edad`, `peso_kg` o
+    `altura_cm` (perfil no configurado), y lanza `VaultError` si los tres
+    están pero son inválidos.
+- **Tests:** `tests/test_vault_perfil_vacio.py` (3 nuevos). Se ajustó
+  `test_read_corrupt_file_raises_vault_error` para usar un perfil
+  completo pero inválido.
+
+## Estado tras Fase 5
+
+- Perfil real configurado por el usuario con `python -m app.main`.
+- Actividad habitual guardada como referencia inicial.
+- La actividad diaria real se añadirá en Fase 8 (el balance usará la
+  actividad del día cuando exista, y solo caerá a la referencia si no).
+
+## Siguiente
+
+- Fase 6 — Registro diario vía agente.
