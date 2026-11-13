@@ -37,6 +37,14 @@ from app.storage.fs import (
     read_text,
 )
 
+from app.core.report_models import (
+    BalanceResumen,
+    ItemResumen,
+    ReporteDiario,
+    ReporteMensual,
+    ReporteSemanal,
+)
+from app.core.results import Fuente, Nutrientes
 
 # ---------------------------------------------------------------------------
 # Meses sin acentos, para rutas portables
@@ -559,3 +567,314 @@ class Vault:
             if desde <= d <= hasta:
                 fechas.add(d)
         return sorted(fechas)
+
+    # --- reportes ---
+    @property
+    def reportes_dir(self) -> Path:
+        return self.data_dir / "04-Reportes"
+
+    def _reporte_diario_path(self, d: date) -> Path:
+        return self.reportes_dir / "diarios" / f"{d.isoformat()}.md"
+
+    def _reporte_semanal_path(self, anio: int, semana: int) -> Path:
+        return self.reportes_dir / "semanales" / f"{anio:04d}-W{semana:02d}.md"
+
+    def _reporte_mensual_path(self, anio: int, mes: int) -> Path:
+        return self.reportes_dir / "mensuales" / f"{anio:04d}-{mes:02d}.md"
+
+    def write_reporte_diario(self, r: ReporteDiario) -> Path:
+        path = self._reporte_diario_path(r.fecha)
+        if path.exists():
+            backup_file(path, self.backup_root, self._root_for_backup)
+        meta = {
+            "tipo": "reporte-diario",
+            "fecha": r.fecha.isoformat(),
+            "fuente": r.fuente.value,
+        }
+        lines = [f"# Reporte diario {r.fecha.isoformat()}", ""]
+        if r.items:
+            lines.append("## Items")
+            lines.append("")
+            lines.append("| # | Ref | Cantidad | Etiqueta | Kcal | Prot | Grasa | Carb |")
+            lines.append("|---|-----|----------|----------|------|------|-------|------|")
+
+            def _v(x):
+                return "—" if x is None else f"{x:.1f}"
+
+            for it in r.items:
+                lines.append(
+                    f"| {it.indice} | {it.ref_tipo}:{it.ref_id} | "
+                    f"{it.cantidad:g} {it.unidad.value} | {it.etiqueta or '—'} | "
+                    f"{_v(it.kcal)} | {_v(it.proteina_g)} | "
+                    f"{_v(it.grasa_g)} | {_v(it.carbo_g)} |"
+                )
+            lines.append("")
+        lines.append("## Totales")
+        lines.append("")
+        lines.append("| Nutriente | Valor |")
+        lines.append("|-----------|-------|")
+
+        def _tv(x):
+            return "—" if x is None else f"{x:.1f}"
+
+        lines.append(f"| Kcal | {_tv(r.totales.kcal)} |")
+        lines.append(f"| Proteína (g) | {_tv(r.totales.proteina_g)} |")
+        lines.append(f"| Grasa (g) | {_tv(r.totales.grasa_g)} |")
+        lines.append(f"| Carbohidratos (g) | {_tv(r.totales.carbo_g)} |")
+        lines.append("")
+        lines.append("## Balance")
+        lines.append("")
+        lines.append("| Concepto | Valor |")
+        lines.append("|----------|-------|")
+        lines.append(f"| Consumo (kcal) | {_tv(r.balance.consumo_kcal)} |")
+        lines.append(f"| Gasto (kcal) | {_tv(r.balance.gasto_kcal)} |")
+        lines.append(f"| Balance (kcal) | {_tv(r.balance.balance_kcal)} |")
+        lines.append(f"| Fuente | {r.balance.fuente.value} |")
+        if r.notas:
+            lines.append("")
+            lines.append("## Notas")
+            lines.append("")
+            for n in r.notas:
+                lines.append(f"- {n}")
+        body = "\n".join(lines) + "\n"
+        text = frontmatter.dump(meta, body)
+        atomic_write_text(path, text)
+        return path
+
+    def read_reporte_diario(self, d: date) -> ReporteDiario | None:
+        path = self._reporte_diario_path(d)
+        if not path.exists():
+            return None
+        text = read_text(path)
+        meta, _ = frontmatter.parse(text)
+        meta.pop("tipo", None)
+        meta.pop("fecha", None)
+        fuente_str = meta.pop("fuente", "desconocido")
+        try:
+            fuente = Fuente(fuente_str)
+        except ValueError:
+            fuente = Fuente.DESCONOCIDO
+        return ReporteDiario(
+            fecha=d,
+            items=[],
+            totales=Nutrientes(),
+            balance=BalanceResumen(fuente=fuente),
+            fuente=fuente,
+            notas=["Leído desde Markdown; regenera para detalles completos."],
+        )
+
+    def write_reporte_semanal(self, r: ReporteSemanal) -> Path:
+        # Semana ISO
+        iso = r.desde.isocalendar()
+        anio, semana = iso[0], iso[1]
+        path = self._reporte_semanal_path(anio, semana)
+        if path.exists():
+            backup_file(path, self.backup_root, self._root_for_backup)
+        meta = {
+            "tipo": "reporte-semanal",
+            "desde": r.desde.isoformat(),
+            "hasta": r.hasta.isoformat(),
+            "anio": anio,
+            "semana": semana,
+            "dias_con_datos": r.dias_con_datos,
+            "dias_sin_datos": r.dias_sin_datos,
+            "dias_entrenados": r.dias_entrenados,
+            "fuente": r.fuente.value,
+        }
+        lines = [f"# Reporte semanal {anio}-W{semana:02d}", ""]
+        lines.append(f"Rango: {r.desde.isoformat()} a {r.hasta.isoformat()}")
+        lines.append("")
+        lines.append("## Resumen")
+        lines.append("")
+        lines.append(f"- Días con datos: {r.dias_con_datos}")
+        lines.append(f"- Días sin datos: {r.dias_sin_datos}")
+        lines.append(f"- Días entrenados: {r.dias_entrenados}")
+        lines.append(f"- Fuente: {r.fuente.value}")
+        lines.append("")
+        lines.append("## Promedios")
+        lines.append("")
+        lines.append("| Nutriente | Valor |")
+        lines.append("|-----------|-------|")
+
+        def _tv(x):
+            return "—" if x is None else f"{x:.1f}"
+
+        lines.append(f"| Kcal | {_tv(r.promedios.kcal)} |")
+        lines.append(f"| Proteína (g) | {_tv(r.promedios.proteina_g)} |")
+        lines.append(f"| Grasa (g) | {_tv(r.promedios.grasa_g)} |")
+        lines.append(f"| Carbohidratos (g) | {_tv(r.promedios.carbo_g)} |")
+        lines.append("")
+        lines.append("## Balance promedio")
+        lines.append("")
+        lines.append("| Concepto | Valor |")
+        lines.append("|----------|-------|")
+        lines.append(f"| Consumo (kcal) | {_tv(r.balance_promedio.consumo_kcal)} |")
+        lines.append(f"| Gasto (kcal) | {_tv(r.balance_promedio.gasto_kcal)} |")
+        lines.append(f"| Balance (kcal) | {_tv(r.balance_promedio.balance_kcal)} |")
+        lines.append(f"| Fuente | {r.balance_promedio.fuente.value} |")
+        if r.comparacion_kcal is not None:
+            lines.append("")
+            lines.append("## Comparación con semana anterior")
+            lines.append("")
+            lines.append(
+                f"- Actual: {_tv(r.comparacion_kcal.valor_actual)} kcal"
+            )
+            lines.append(
+                f"- Anterior: {_tv(r.comparacion_kcal.valor_anterior)} kcal"
+            )
+            lines.append(
+                f"- Diferencia: {_tv(r.comparacion_kcal.diferencia)} kcal"
+            )
+        if r.notas:
+            lines.append("")
+            lines.append("## Notas")
+            lines.append("")
+            for n in r.notas:
+                lines.append(f"- {n}")
+        body = "\n".join(lines) + "\n"
+        text = frontmatter.dump(meta, body)
+        atomic_write_text(path, text)
+        return path
+
+    def read_reporte_semanal(self, anio: int, semana: int) -> ReporteSemanal | None:
+        path = self._reporte_semanal_path(anio, semana)
+        if not path.exists():
+            return None
+        text = read_text(path)
+        meta, _ = frontmatter.parse(text)
+        meta.pop("tipo", None)
+        desde_str = meta.pop("desde", None)
+        hasta_str = meta.pop("hasta", None)
+        meta.pop("anio", None)
+        meta.pop("semana", None)
+        dias_con = int(meta.pop("dias_con_datos", 0))
+        dias_sin = int(meta.pop("dias_sin_datos", 0))
+        entrenados = int(meta.pop("dias_entrenados", 0))
+        fuente_str = meta.pop("fuente", "desconocido")
+        try:
+            fuente = Fuente(fuente_str)
+        except ValueError:
+            fuente = Fuente.DESCONOCIDO
+        if desde_str is None or hasta_str is None:
+            return None
+        return ReporteSemanal(
+            desde=date.fromisoformat(str(desde_str)),
+            hasta=date.fromisoformat(str(hasta_str)),
+            dias_con_datos=dias_con,
+            dias_sin_datos=dias_sin,
+            dias_entrenados=entrenados,
+            promedios=Nutrientes(),
+            balance_promedio=BalanceResumen(fuente=fuente),
+            fuente=fuente,
+            notas=["Leído desde Markdown; regenera para detalles completos."],
+        )
+
+    def write_reporte_mensual(self, r: ReporteMensual) -> Path:
+        anio = r.desde.year
+        mes = r.desde.month
+        path = self._reporte_mensual_path(anio, mes)
+        if path.exists():
+            backup_file(path, self.backup_root, self._root_for_backup)
+        meta = {
+            "tipo": "reporte-mensual",
+            "desde": r.desde.isoformat(),
+            "hasta": r.hasta.isoformat(),
+            "anio": anio,
+            "mes": mes,
+            "dias_con_datos": r.dias_con_datos,
+            "dias_sin_datos": r.dias_sin_datos,
+            "dias_entrenados": r.dias_entrenados,
+            "consistencia_pct": r.consistencia_pct,
+            "fuente": r.fuente.value,
+        }
+        lines = [f"# Reporte mensual {anio}-{mes:02d}", ""]
+        lines.append(f"Rango: {r.desde.isoformat()} a {r.hasta.isoformat()}")
+        lines.append("")
+        lines.append("## Resumen")
+        lines.append("")
+        lines.append(f"- Días con datos: {r.dias_con_datos}")
+        lines.append(f"- Días sin datos: {r.dias_sin_datos}")
+        lines.append(f"- Días entrenados: {r.dias_entrenados}")
+        if r.consistencia_pct is not None:
+            lines.append(f"- Consistencia: {r.consistencia_pct:.1f}%")
+        lines.append(f"- Fuente: {r.fuente.value}")
+        lines.append("")
+        lines.append("## Promedios")
+        lines.append("")
+        lines.append("| Nutriente | Valor |")
+        lines.append("|-----------|-------|")
+
+        def _tv(x):
+            return "—" if x is None else f"{x:.1f}"
+
+        lines.append(f"| Kcal | {_tv(r.promedios.kcal)} |")
+        lines.append(f"| Proteína (g) | {_tv(r.promedios.proteina_g)} |")
+        lines.append(f"| Grasa (g) | {_tv(r.promedios.grasa_g)} |")
+        lines.append(f"| Carbohidratos (g) | {_tv(r.promedios.carbo_g)} |")
+        lines.append("")
+        lines.append("## Balance promedio")
+        lines.append("")
+        lines.append("| Concepto | Valor |")
+        lines.append("|----------|-------|")
+        lines.append(f"| Consumo (kcal) | {_tv(r.balance_promedio.consumo_kcal)} |")
+        lines.append(f"| Gasto (kcal) | {_tv(r.balance_promedio.gasto_kcal)} |")
+        lines.append(f"| Balance (kcal) | {_tv(r.balance_promedio.balance_kcal)} |")
+        lines.append(f"| Fuente | {r.balance_promedio.fuente.value} |")
+        if r.comparacion_kcal is not None:
+            lines.append("")
+            lines.append("## Comparación con mes anterior")
+            lines.append("")
+            lines.append(
+                f"- Actual: {_tv(r.comparacion_kcal.valor_actual)} kcal"
+            )
+            lines.append(
+                f"- Anterior: {_tv(r.comparacion_kcal.valor_anterior)} kcal"
+            )
+            lines.append(
+                f"- Diferencia: {_tv(r.comparacion_kcal.diferencia)} kcal"
+            )
+        if r.notas:
+            lines.append("")
+            lines.append("## Notas")
+            lines.append("")
+            for n in r.notas:
+                lines.append(f"- {n}")
+        body = "\n".join(lines) + "\n"
+        text = frontmatter.dump(meta, body)
+        atomic_write_text(path, text)
+        return path
+
+    def read_reporte_mensual(self, anio: int, mes: int) -> ReporteMensual | None:
+        path = self._reporte_mensual_path(anio, mes)
+        if not path.exists():
+            return None
+        text = read_text(path)
+        meta, _ = frontmatter.parse(text)
+        meta.pop("tipo", None)
+        desde_str = meta.pop("desde", None)
+        hasta_str = meta.pop("hasta", None)
+        meta.pop("anio", None)
+        meta.pop("mes", None)
+        dias_con = int(meta.pop("dias_con_datos", 0))
+        dias_sin = int(meta.pop("dias_sin_datos", 0))
+        entrenados = int(meta.pop("dias_entrenados", 0))
+        consistencia = meta.pop("consistencia_pct", None)
+        fuente_str = meta.pop("fuente", "desconocido")
+        try:
+            fuente = Fuente(fuente_str)
+        except ValueError:
+            fuente = Fuente.DESCONOCIDO
+        if desde_str is None or hasta_str is None:
+            return None
+        return ReporteMensual(
+            desde=date.fromisoformat(str(desde_str)),
+            hasta=date.fromisoformat(str(hasta_str)),
+            dias_con_datos=dias_con,
+            dias_sin_datos=dias_sin,
+            dias_entrenados=entrenados,
+            consistencia_pct=consistencia,
+            promedios=Nutrientes(),
+            balance_promedio=BalanceResumen(fuente=fuente),
+            fuente=fuente,
+            notas=["Leído desde Markdown; regenera para detalles completos."],
+        )
