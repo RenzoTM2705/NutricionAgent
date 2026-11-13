@@ -50,10 +50,24 @@ class OllamaModel:
 
 
 class OllamaClient:
+    
     def __init__(self, settings: OllamaSettings) -> None:
         self._settings = settings
         self._session = requests.Session()
         self._base = settings.host.rstrip("/")
+
+    @property
+    def model(self) -> str:
+        """Modelo activo en este cliente."""
+        return self._settings.model
+
+    def with_model(self, nuevo_modelo: str) -> "OllamaClient":
+        """Devuelve un nuevo cliente con el mismo host pero otro modelo.
+
+        No cierra el cliente actual; el llamante decide cuándo cerrarlo.
+        """
+        return OllamaClient(self._settings.model_copy(update={"model": nuevo_modelo}))
+
 
     # --- helpers ---
     def _url(self, path: str) -> str:

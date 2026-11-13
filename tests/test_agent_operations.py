@@ -148,3 +148,51 @@ def test_parsear_fecha_demasiado_antigua_falla():
     hoy = date(2026, 11, 12)
     with pytest.raises(OperacionInvalida):
         parsear_fecha("1999-12-31", hoy=hoy)
+
+def test_validar_alta_alimento():
+    from app.agent.operations import AltaAlimentoOp
+    op = validar_operacion(
+        {
+            "tipo": "alta_alimento",
+            "id": "pechuga-de-pavo",
+            "nombre": "Pechuga de pavo",
+            "kcal_por_100": 120.0,
+            "proteina_g_por_100": 22.0,
+        }
+    )
+    assert isinstance(op, AltaAlimentoOp)
+    assert op.id == "pechuga-de-pavo"
+    assert op.unidad_base == Unidad.G
+    assert op.grasa_g_por_100 is None
+
+
+def test_validar_alta_alimento_sin_nombre_falla():
+    from app.agent.operations import OperacionInvalida
+    with pytest.raises(OperacionInvalida):
+        validar_operacion(
+            {"tipo": "alta_alimento", "id": "x"}
+        )
+
+def test_validar_editar_item_cantidad():
+    from app.agent.operations import EditarItemOp
+    op = validar_operacion(
+        {"tipo": "editar_item", "indice": 1, "cantidad": 200}
+    )
+    assert isinstance(op, EditarItemOp)
+    assert op.cantidad == 200
+    assert op.unidad is None
+    assert op.etiqueta is None
+
+
+def test_validar_editar_item_sin_cambios_falla():
+    from app.agent.operations import OperacionInvalida
+    with pytest.raises(OperacionInvalida):
+        validar_operacion({"tipo": "editar_item", "indice": 1})
+
+
+def test_validar_editar_item_indice_cero_falla():
+    from app.agent.operations import OperacionInvalida
+    with pytest.raises(OperacionInvalida):
+        validar_operacion(
+            {"tipo": "editar_item", "indice": 0, "cantidad": 100}
+        )

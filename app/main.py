@@ -15,7 +15,7 @@ Códigos de salida:
 from __future__ import annotations
 
 import sys
-
+from app.agent.loop import run_loop
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Confirm
@@ -116,69 +116,53 @@ def run() -> int:
     _banner(console)
 
     settings = get_settings()
-    backup_root = settings.project_root / "data" / "backups"
+    backup_root = settings.data_dir.parent / "backups"
     vault = Vault(
         data_dir=settings.data_dir,
         backup_root=backup_root,
-        root_for_backup=settings.project_root / "data",
+        root_for_backup=settings.data_dir.parent,
     )
-
-    if perfil_existente(vault):
-        console.print(
-            Panel.fit(
-                f"Perfil encontrado en {vault.perfil_path}.\n"
-                "La app conversacional llegará en una fase posterior.",
-                border_style="green",
-            )
-        )
-        return 0
-
-    console.print("No hay perfil configurado. Iniciando asistente.\n")
 
     client = OllamaClient(settings.ollama)
     try:
-        continuar, modelo = _flujo_ollama(console, client, settings.ollama.model)
-        if not continuar:
-            console.print("[yellow]Configuración cancelada.[/yellow]")
-            return 2
+        if not perfil_existente(vault):
+            console.print("No hay perfil configurado. Iniciando asistente.\n")
+            continuar, modelo = _flujo_ollama(console, client, settings.ollama.model)
+            if not continuar:
+                console.print("[yellow]Configuración cancelada.[/yellow]")
+                return 2
 
-        console.print("\n[bold]Datos del perfil[/bold]")
-        perfil_data = preguntar_perfil(console)
+            perfil_data = preguntar_perfil(console)
+            objetivos_data = preguntar_objetivos(console)
+            actividad_data = preguntar_actividad(console)
 
-        console.print("\n[bold]Objetivos (opcional)[/bold]")
-        objetivos_data = preguntar_objetivos(console)
+            data = SetupInput(
+                **perfil_data,
+                **objetivos_data,
+                **actividad_data,
+                modelo=modelo,
+            )
 
-        console.print("\n[bold]Actividad habitual (opcional)[/bold]")
-        actividad_data = preguntar_actividad(console)
+            confirmado, data_final = confirmar_o_editar(console, data)
+            if not confirmado:
+                console.print("[yellow]Configuración cancelada.[/yellow]")
+                return 2
 
-        data = SetupInput(
-            **perfil_data,
-            **objetivos_data,
-            **actividad_data,
-            modelo=modelo,
-        )
+            result = aplicar_setup(data_final, vault)
+            if not result.ok:
+                console.print("[red]No se pudo guardar la configuración:[/red]")
+                for e in result.errores:
+                    console.print(f"  - {e.campo}: {e.mensaje}")
+                return 1
 
-        confirmado, data_final = confirmar_o_editar(console, data)
-        if not confirmado:
-            console.print("[yellow]Configuración cancelada.[/yellow]")
-            return 2
+            console.print("\n[green]Configuración guardada.[/green]")
+            for r in result.rutas_escritas:
+                console.print(f"  - {r}")
+            if result.modelo:
+                console.print(f"Modelo IA: {result.modelo}")
 
-        result = aplicar_setup(data_final, vault)
-        if not result.ok:
-            console.print("[red]No se pudo guardar la configuración:[/red]")
-            for e in result.errores:
-                console.print(f"  - {e.campo}: {e.mensaje}")
-            return 1
-
-        console.print("\n[green]Configuración guardada.[/green]")
-        for r in result.rutas_escritas:
-            console.print(f"  - {r}")
-        if result.modelo:
-            console.print(f"Modelo IA: {result.modelo}")
-        else:
-            console.print("Modo: solo memoria (sin IA).")
-        console.print("\n[bold cyan]¡Bienvenido a NutricionAgent![/bold cyan]")
-        return 0
+        # Entrar al bucle conversacional
+        return run_loop(vault, client, console)
     except KeyboardInterrupt:
         console.print("\n[yellow]Interrumpido por el usuario.[/yellow]")
         return 2

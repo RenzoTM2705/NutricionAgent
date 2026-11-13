@@ -41,6 +41,19 @@ class EliminarItemOp(_BaseOp):
     indice: int = Field(ge=1, le=1000)
     fecha: Optional[str] = None
 
+class EditarItemOp(_BaseOp):
+    tipo: Literal["editar_item"]
+    indice: int = Field(ge=1, le=1000)
+    cantidad: Optional[float] = Field(default=None, gt=0.0, le=10000.0)
+    unidad: Optional[Unidad] = None
+    etiqueta: Optional[str] = Field(default=None, max_length=40)
+    fecha: Optional[str] = None
+
+    def model_post_init(self, __context) -> None:  # type: ignore[override]
+        if self.cantidad is None and self.unidad is None and self.etiqueta is None:
+            raise ValueError(
+                "editar_item requiere al menos uno de: cantidad, unidad, etiqueta."
+            )
 
 class ConsultarTotalesOp(_BaseOp):
     tipo: Literal["consultar_totales"]
@@ -56,6 +69,19 @@ class ConsultarAlimentosOp(_BaseOp):
     tipo: Literal["consultar_alimentos"]
     texto: str = Field(min_length=1, max_length=80)
 
+class AltaAlimentoOp(_BaseOp):
+    tipo: Literal["alta_alimento"]
+    id: str = Field(min_length=1, max_length=80)
+    nombre: str = Field(min_length=1, max_length=120)
+    marca: Optional[str] = Field(default=None, max_length=120)
+    unidad_base: Unidad = Unidad.G
+    peso_referencia_g: Optional[float] = Field(default=None, gt=0.0, le=5000.0)
+    kcal_por_100: Optional[float] = Field(default=None, ge=0.0, le=2000.0)
+    proteina_g_por_100: Optional[float] = Field(default=None, ge=0.0, le=200.0)
+    grasa_g_por_100: Optional[float] = Field(default=None, ge=0.0, le=200.0)
+    carbo_g_por_100: Optional[float] = Field(default=None, ge=0.0, le=200.0)
+    fuente: Optional[str] = Field(default=None, max_length=200)
+    notas: Optional[str] = Field(default=None, max_length=1000)
 
 class ResponderOp(_BaseOp):
     tipo: Literal["responder"]
@@ -67,9 +93,11 @@ Operacion = Annotated[
         AgregarItemOp,
         AgregarRecetaOp,
         EliminarItemOp,
+        EditarItemOp,
         ConsultarTotalesOp,
         ListarItemsOp,
         ConsultarAlimentosOp,
+        AltaAlimentoOp,
         ResponderOp,
     ],
     Field(discriminator="tipo"),
