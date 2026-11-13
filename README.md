@@ -15,6 +15,16 @@ En desarrollo. Fases completadas:
 - **Fase 1** — Entorno portable, venv, bóveda inicial, Git.
 - **Fase 2** — Cliente Ollama, configuración tipada, errores, pruebas.
 - **Fase 3** — Sistema de memoria Markdown: modelos de dominio, almacenamiento atómico, backups, frontmatter, Vault para perfil, objetivos, actividad, alimentos, recetas y registro diario.
+- **Fase 4** — Motor nutricional: conversión de unidades, cálculo por item, totales diarios, recetas con ingredientes anidados, BMR (Mifflin-St Jeor), factor de actividad, TDEE y balance energético. Regla estricta: nutrientes desconocidos = `None`, nunca `0`; resultados parciales explícitos.
+
+Próximas fases:
+
+- **Fase 5** — Configuración inicial del usuario.
+- **Fase 6** — Registro diario vía agente.
+- **Fase 7** — Agente conversacional.
+- **Fase 8** — Actividad y gasto energético.
+- **Fase 9** — Reportes.
+- **Fase 10** — Distribución (PyInstaller, Inno Setup, GitHub Releases).
 
 Próximas fases:
 
@@ -89,4 +99,3 @@ No se envían datos a servicios externos.
 ## Licencia
 
 Por definir.
-
