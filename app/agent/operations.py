@@ -54,6 +54,8 @@ class EditarItemOp(_BaseOp):
             raise ValueError(
                 "editar_item requiere al menos uno de: cantidad, unidad, etiqueta."
             )
+        
+
 
 class ConsultarTotalesOp(_BaseOp):
     tipo: Literal["consultar_totales"]
@@ -83,6 +85,36 @@ class AltaAlimentoOp(_BaseOp):
     fuente: Optional[str] = Field(default=None, max_length=200)
     notas: Optional[str] = Field(default=None, max_length=1000)
 
+class RegistrarActividadOp(_BaseOp):
+    tipo: Literal["registrar_actividad"]
+    horas_trabajo: Optional[float] = Field(default=None, ge=0.0, le=24.0)
+    horas_de_pie: Optional[float] = Field(default=None, ge=0.0, le=24.0)
+    pasos: Optional[int] = Field(default=None, ge=0, le=100000)
+    gimnasio: Optional[bool] = None
+    gimnasio_duracion_min: Optional[int] = Field(default=None, ge=0, le=600)
+    tipo_entrenamiento: Optional[str] = Field(default=None, max_length=120)
+    otros_deportes: Optional[str] = Field(default=None, max_length=200)
+    notas: Optional[str] = Field(default=None, max_length=1000)
+    fecha: Optional[str] = None
+
+    def model_post_init(self, __context) -> None:  # type: ignore[override]
+        if not any(
+            v is not None
+            for v in (
+                self.horas_trabajo,
+                self.horas_de_pie,
+                self.pasos,
+                self.gimnasio,
+                self.gimnasio_duracion_min,
+                self.tipo_entrenamiento,
+                self.otros_deportes,
+                self.notas,
+            )
+        ):
+            raise ValueError(
+                "registrar_actividad requiere al menos un campo de actividad."
+            )
+
 class ResponderOp(_BaseOp):
     tipo: Literal["responder"]
     mensaje: str = Field(min_length=1, max_length=2000)
@@ -98,6 +130,7 @@ Operacion = Annotated[
         ListarItemsOp,
         ConsultarAlimentosOp,
         AltaAlimentoOp,
+        RegistrarActividadOp,
         ResponderOp,
     ],
     Field(discriminator="tipo"),

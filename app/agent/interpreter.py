@@ -75,8 +75,17 @@ estas formas; no añadas texto fuera del JSON):
     "grasa_g_por_100": <número|null>, "carbo_g_por_100": <número|null>,
     "fuente": <string|null>, "notas": <string|null>}
 
-9. Responder sin ejecutar nada (aclaraciones, errores, saludos):
-   {"tipo": "responder", "mensaje": "<texto>"}
+9. Registrar la actividad del día:
+   {"tipo": "registrar_actividad",
+    "horas_trabajo": <número|null>, "horas_de_pie": <número|null>,
+    "pasos": <entero|null>, "gimnasio": <true|false|null>,
+    "gimnasio_duracion_min": <entero|null>,
+    "tipo_entrenamiento": <string|null>, "otros_deportes": <string|null>,
+    "notas": <string|null>, "fecha": <"YYYY-MM-DD"|"hoy"|"ayer"|null>}
+
+10. Responder sin ejecutar nada (aclaraciones, errores, saludos):
+   {"tipo": "responder", "mensaje": "<texto>"}    
+
 
 Reglas:
 - Usa SOLO los ids de alimentos y recetas que aparecen en el contexto.
@@ -92,6 +101,9 @@ usa fecha=null (el sistema usará hoy).
 - El id del alimento nuevo debe ser un slug sin espacios (minúsculas, guiones).
 - Para borrar la etiqueta de un item, usa "etiqueta": "".
 - editar_item no cambia el alimento ni la receta; solo cantidad, unidad o etiqueta.
+- Si el usuario describe su actividad del día ("hoy trabajé 8 h", "fui al
+  gimnasio 1 h", "anduve 9000 pasos"), usa "registrar_actividad" con los
+  datos que dé. No inventes valores: deja null los que no dé.
 """
 
 

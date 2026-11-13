@@ -32,6 +32,7 @@ from app.models.domain import (
     Perfil,
     Receta,
     RegistroDiario,
+    ActividadDia,
 )
 
 from app.agent.interpreter import interpretar
@@ -47,6 +48,7 @@ from app.agent.operations import (
     OperacionInvalida,
     ResponderOp,
     parsear_fecha,
+    RegistrarActividadOp,
 )
 from app.agent.tools import (
     agregar_item,
@@ -176,6 +178,21 @@ def _confirmar_editar_item(
         )
     console.print(table)
     return Confirm.ask("¿Confirmas la edición?", default=False, console=console)
+
+def _confirmar_registrar_actividad(console: Console, op: RegistrarActividadOp) -> bool:
+    table = Table(title="Actividad del día")
+    table.add_column("Campo", style="cyan")
+    table.add_column("Valor")
+    for k, v in op.model_dump(exclude_none=True).items():
+        if k == "tipo":
+            continue
+        table.add_row(k, str(v))
+    console.print(table)
+    return Confirm.ask(
+        "Ya hay actividad registrada hoy. ¿Sobrescribir?",
+        default=False,
+        console=console,
+    )
 
 def _ejecutar_operacion(
     op,
@@ -307,6 +324,49 @@ def _ejecutar_operacion(
             return registro, False
         console.print(f"[green]Alimento agregado: {op.id}[/green]")
         return registro, False
+    
+    if isinstance(op, RegistrarActividadOp):
+        fecha = parsear_fecha(op.fecha)
+        reg = registro if fecha == registro.fecha else _nuevo_registro(fecha, vault)
+        if reg.actividad_dia is not None:
+            if not _confirmar_registrar_actividad(console, op):
+                console.print("[dim]Registro cancelado.[/dim]")
+                return registro, False
+        act = ActividadDia(
+            horas_trabajo=op.horas_trabajo,
+            horas_de_pie=op.horas_de_pie,
+            pasos=op.pasos,
+            gimnasio=op.gimnasio,
+            gimnasio_duracion_min=op.gimnasio_duracion_min,
+            tipo_entrenamiento=op.tipo_entrenamiento,
+            otros_deportes=op.otros_deportes,
+            notas=op.notas,
+        )
+        reg_nuevo = reg.model_copy(update={"actividad_dia": act})
+        console.print("[green]Actividad del día registrada.[/green]")
+        try:
+            perfil = vault.read_perfil()
+            hab = vault.read_actividad()
+            if perfil is not None:
+                from app.core.nutrition import calcular_balance
+                bal = calcular_balance(
+                    reg_nuevo, perfil, hab or ActividadHabitual(), vault
+                )
+                if bal.balance_kcal is not None:
+                    console.print(
+                        f"TDEE estimado: {bal.gasto_kcal:.1f} kcal; "
+                        f"consumo: {bal.consumo_kcal:.1f} kcal; "
+                        f"balance: {bal.balance_kcal:+.1f} kcal "
+                        f"({bal.fuente.value})"
+                    )
+                else:
+                    console.print(
+                        f"[dim]Balance no calculable ({bal.fuente.value}).[/dim]"
+                    )
+        except Exception as exc:
+            console.print(f"[dim]No se pudo calcular el balance: {exc}[/dim]")
+        return reg_nuevo, True
+
     
     if isinstance(op, ResponderOp):
         console.print(Panel(op.mensaje, border_style="blue"))
